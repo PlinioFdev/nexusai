@@ -35,6 +35,9 @@ class Document(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="documents")  # type: ignore[name-defined]
+    chunks: Mapped[list["Chunk"]] = relationship(  # type: ignore[name-defined]
+        back_populates="document", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_documents_tenant_status", "tenant_id", "status"),

@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     PINECONE_API_KEY: str = ""
     PINECONE_INDEX_NAME: str = "nexusai"
 
+    # M2: Voyage AI — embeddings (https://dash.voyageai.com/api-keys)
+    VOYAGE_API_KEY: str = ""
+
+    # M2: Storage — volume local em dev, trocar por S3 no M5
+    UPLOAD_DIR: str = "/app/uploads"
+
+    # M2: Chunking
+    CHUNK_SIZE_TOKENS: int = 512
+    CHUNK_OVERLAP_TOKENS: int = 50
+
     @property
     def is_development(self) -> bool:
         return self.ENVIRONMENT == "development"
