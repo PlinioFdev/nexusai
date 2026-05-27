@@ -1,3 +1,5 @@
+import re
+
 from pydantic import BaseModel, EmailStr, field_validator
 
 from app.models.user import UserRole
@@ -14,10 +16,6 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
 
 
 # ─── User ────────────────────────────────────────────────────────────────────
@@ -52,7 +50,6 @@ class TenantCreate(BaseModel):
     @field_validator("slug")
     @classmethod
     def slug_format(cls, v: str) -> str:
-        import re
         if not re.match(r"^[a-z0-9-]+$", v):
             raise ValueError("Slug deve conter apenas letras minúsculas, números e hífens")
         return v
