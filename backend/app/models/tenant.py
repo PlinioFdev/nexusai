@@ -10,6 +10,10 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Chave de API para autenticação do widget embeddable — nullable até ser gerada
+    api_key: Mapped[str | None] = mapped_column(
+        String(64), unique=True, nullable=True, index=True
+    )
 
     users: Mapped[list["User"]] = relationship(  # type: ignore[name-defined]
         back_populates="tenant", cascade="all, delete-orphan"

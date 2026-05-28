@@ -25,8 +25,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS
+    # CORS — dashboard (origens específicas)
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+
+    # CORS — widget embeddable (aceita qualquer origem por padrão)
+    # Em produção, restringir para os domínios dos clientes se necessário
+    WIDGET_CORS_ORIGINS: List[str] = ["*"]
 
     # Claude API
     ANTHROPIC_API_KEY: str = ""

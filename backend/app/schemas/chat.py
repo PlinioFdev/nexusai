@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 
-# ── ChatSession ──────────────────────────────────────────────────────────────
+# ── ChatSession ───────────────────────────────────────────────────────────────
 
 class ChatSessionCreate(BaseModel):
     title: str = "Nova conversa"
@@ -31,7 +31,7 @@ class ChatSessionListResponse(BaseModel):
     total: int
 
 
-# ── Message ──────────────────────────────────────────────────────────────────
+# ── Message ───────────────────────────────────────────────────────────────────
 
 class MessageCreate(BaseModel):
     content: str
@@ -49,10 +49,15 @@ class MessageResponse(BaseModel):
     session_id: str
     role: str
     content: str
-    source_chunks: str | None = None  # JSON array de chunk IDs
+    source_chunks: str | None = None  # JSON array de chunk IDs serializado
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MessageListResponse(BaseModel):
+    items: list[MessageResponse]
+    total: int
 
 
 class ChatResponse(BaseModel):

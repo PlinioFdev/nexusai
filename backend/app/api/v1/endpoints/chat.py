@@ -2,11 +2,12 @@
 Endpoints de chat RAG.
 
 Rotas:
-  POST   /chat/sessions                    → cria sessão
-  GET    /chat/sessions                    → lista sessões do usuário
-  GET    /chat/sessions/{session_id}       → detalhe + mensagens
-  DELETE /chat/sessions/{session_id}       → deleta sessão
-  POST   /chat/sessions/{session_id}/messages → envia mensagem, recebe resposta RAG
+  POST   /chat/sessions                              → cria sessão
+  GET    /chat/sessions                              → lista sessões do usuário
+  GET    /chat/sessions/{session_id}                 → detalhe da sessão
+  DELETE /chat/sessions/{session_id}                 → deleta sessão
+  GET    /chat/sessions/{session_id}/messages        → lista mensagens da sessão
+  POST   /chat/sessions/{session_id}/messages        → envia mensagem, recebe resposta RAG
 """
 
 import json
@@ -26,6 +27,7 @@ from app.schemas.chat import (
     ChatSessionListResponse,
     ChatSessionResponse,
     MessageCreate,
+    MessageListResponse,
     MessageResponse,
 )
 from app.services.embedding import embed_query
@@ -124,6 +126,22 @@ def delete_session(
     session = _get_session_or_404(session_id, current_user.tenant_id, str(current_user.id), db)
     db.delete(session)
     db.commit()
+
+
+@router.get("/sessions/{session_id}/messages", response_model=MessageListResponse)
+def list_messages(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageListResponse:
+    """Lista todas as mensagens de uma sessão ordenadas por created_at."""
+    # Valida que a sessão pertence ao tenant + user
+    session = _get_session_or_404(session_id, current_user.tenant_id, str(current_user.id), db)
+    messages = sorted(session.messages, key=lambda m: m.created_at)
+    return MessageListResponse(
+        items=[MessageResponse.model_validate(m) for m in messages],
+        total=len(messages),
+    )
 
 
 @router.post("/sessions/{session_id}/messages", response_model=ChatResponse)

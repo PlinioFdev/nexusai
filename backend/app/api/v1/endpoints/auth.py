@@ -19,6 +19,7 @@ from app.schemas.auth import (
     UserResponse,
     TenantCreate,
 )
+from app.api.v1.deps import get_current_user
 from jose import JWTError
 
 router = APIRouter()
@@ -169,3 +170,9 @@ def refresh_token(
 def logout(response: Response) -> dict:
     response.delete_cookie("refresh_token")
     return {"detail": "Logout realizado com sucesso"}
+
+
+@router.get("/me", response_model=UserResponse)
+def me(current_user: User = Depends(get_current_user)) -> User:
+    """Retorna os dados do usuário autenticado."""
+    return current_user
