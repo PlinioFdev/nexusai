@@ -51,12 +51,12 @@ def _create_user(db: Session, tenant: Tenant, email: str = "user@test.com") -> U
     return user
 
 
-def _auth_headers(client: TestClient, email: str = "user@test.com") -> dict:
+def _auth_headers(client: TestClient, slug: str = "test-tenant", email: str = "user@test.com") -> dict:
     resp = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": "password123"},
+        json={"email": email, "password": "password123", "slug": slug},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.json()
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
@@ -89,23 +89,11 @@ class TestSplitText:
             assert chunk.token_count <= 512
 
     def test_adjacent_chunks_have_overlap(self):
-        """
-        Verifica que chunks adjacentes se sobrepõem em conteúdo.
-        Prova: chunk[N+1] começa antes do fim de chunk[N].
-        Estratégia: decodifica os tokens de volta e verifica que o
-        início do chunk[1] aparece dentro do chunk[0].
-        """
         text = " ".join([f"word{i}" for i in range(1000)])
         chunks = split_text(text)
         assert len(chunks) >= 2
-
-        # O início do chunk[1] deve estar contido no final do chunk[0]
-        # Pegamos as primeiras 5 palavras do chunk[1] e verificamos
-        # que pelo menos uma aparece no chunk[0]
         start_of_second = chunks[1].content.split()[:5]
-        assert any(w in chunks[0].content for w in start_of_second), (
-            "chunk[1] deve compartilhar conteúdo com o final de chunk[0]"
-        )
+        assert any(w in chunks[0].content for w in start_of_second)
 
 
 # =========================================================================== #
@@ -180,7 +168,6 @@ class TestEmbedTexts:
 
 class TestUploadEndpoint:
     def test_unauthenticated_returns_403(self, client: TestClient):
-        # HTTPBearer retorna 403 quando não há token (comportamento padrão FastAPI)
         resp = client.post(
             "/api/v1/documents/upload",
             files={"file": ("test.pdf", io.BytesIO(b"data"), "application/pdf")},
@@ -190,7 +177,7 @@ class TestUploadEndpoint:
     def test_invalid_extension_returns_422(self, client: TestClient, db: Session):
         tenant = _create_tenant(db)
         _create_user(db, tenant)
-        headers = _auth_headers(client)
+        headers = _auth_headers(client, slug=tenant.slug)
 
         with patch("app.api.v1.endpoints.documents.ingest_document") as mock_task:
             resp = client.post(
@@ -205,7 +192,7 @@ class TestUploadEndpoint:
     def test_valid_pdf_returns_202_and_enqueues(self, client: TestClient, db: Session):
         tenant = _create_tenant(db)
         _create_user(db, tenant)
-        headers = _auth_headers(client)
+        headers = _auth_headers(client, slug=tenant.slug)
 
         with (
             patch("app.services.storage.save") as mock_save,
@@ -242,7 +229,7 @@ class TestUploadEndpoint:
 
         tenant_b = _create_tenant(db, slug="tenant-b")
         _create_user(db, tenant_b, email="b@test.com")
-        headers_b = _auth_headers(client, email="b@test.com")
+        headers_b = _auth_headers(client, slug="tenant-b", email="b@test.com")
 
         resp = client.get(f"/api/v1/documents/{doc.id}", headers=headers_b)
         assert resp.status_code == 404

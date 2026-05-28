@@ -72,12 +72,24 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
 ) -> dict:
-    user = db.query(User).filter(User.email == body.email).first()
+    # Resolve tenant pelo slug primeiro — 401 genérico para não vazar existência
+    tenant = db.query(Tenant).filter(Tenant.slug == body.slug).first()
+
+    user = (
+        db.query(User)
+        .filter(
+            User.tenant_id == tenant.id if tenant else None,
+            User.email == body.email,
+        )
+        .first()
+        if tenant
+        else None
+    )
 
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
+            detail="Credenciais inválidas",
         )
 
     if not user.is_active:

@@ -7,7 +7,6 @@ para isolar a lógica dos endpoints sem depender de APIs externas.
 
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.services.rag import RAGResult
@@ -25,8 +24,9 @@ def _register_and_login(client: TestClient, slug: str = "acme") -> str:
     )
     res = client.post(
         "/api/v1/auth/login",
-        json={"email": f"owner@{slug}.com", "password": "secret123"},
+        json={"email": f"owner@{slug}.com", "password": "secret123", "slug": slug},
     )
+    assert res.status_code == 200, res.json()
     return res.json()["access_token"]
 
 
@@ -55,7 +55,6 @@ _FAKE_RAG_RESULT = RAGResult(
     source_chunk_ids=["doc1#0"],
 )
 
-# RAGResult para o caso sem chunks relevantes
 _FAKE_RAG_RESULT_NO_CONTEXT = RAGResult(
     answer="Não encontrei informações sobre esse assunto nos documentos.",
     source_chunk_ids=[],
@@ -121,7 +120,7 @@ class TestChatSession:
 
     def test_unauthenticated_request_fails(self, client: TestClient):
         res = client.get("/api/v1/chat/sessions")
-        assert res.status_code == 403  # HTTPBearer retorna 403 sem credencial
+        assert res.status_code == 403
 
 
 # ── Multi-tenancy isolation ───────────────────────────────────────────────────
@@ -132,7 +131,7 @@ class TestTenantIsolation:
         token_b = _register_and_login(client, slug="tenant-b")
         session_id = _create_session(client, token_a)
         res = client.get(f"/api/v1/chat/sessions/{session_id}", headers=_auth(token_b))
-        assert res.status_code == 404  # 404, não 403 — não vaza existência
+        assert res.status_code == 404
 
     def test_sessions_list_isolated_per_tenant(self, client: TestClient):
         token_a = _register_and_login(client, slug="tenant-a")
@@ -188,8 +187,7 @@ class TestRAGPipeline:
             headers=_auth(token),
         )
         assert res.status_code == 200
-        data = res.json()
-        assert data["assistant_message"]["source_chunks"] is None
+        assert res.json()["assistant_message"]["source_chunks"] is None
 
     def test_send_message_empty_content_fails(self, client: TestClient):
         token = _register_and_login(client)

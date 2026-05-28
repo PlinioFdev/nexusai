@@ -11,6 +11,14 @@ from app.schemas.base import TimestampSchema
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    slug: str
+
+    @field_validator("slug")
+    @classmethod
+    def slug_format(cls, v: str) -> str:
+        if not re.match(r"^[a-z0-9-]+$", v):
+            raise ValueError("Slug deve conter apenas letras minúsculas, números e hífens")
+        return v
 
 
 class TokenResponse(BaseModel):
