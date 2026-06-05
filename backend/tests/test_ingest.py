@@ -7,9 +7,11 @@ Segue o padrão do conftest.py do M1:
 - mocks para serviços externos (Voyage AI, Pinecone, Celery)
 """
 
+import asyncio
 import io
 import uuid
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +21,7 @@ from app.models.document import Document, DocumentStatus
 from app.models.tenant import Tenant
 from app.models.user import User, UserRole
 from app.services.chunking import split_text
-from app.services.storage import StorageError, _validate
+from app.services.storage import StorageError, _validate, delete, download_to_tmp, save
 
 
 # =========================================================================== #
@@ -97,7 +99,7 @@ class TestSplitText:
 
 
 # =========================================================================== #
-# Storage                                                                       #
+# Storage — validação                                                           #
 # =========================================================================== #
 
 class TestValidateFile:
@@ -117,6 +119,135 @@ class TestValidateFile:
 
     def test_exactly_at_limit_accepted(self):
         assert _validate("file.pdf", 20 * 1024 * 1024) == "pdf"
+
+
+# =========================================================================== #
+# Storage — R2 (prod)                                                           #
+# =========================================================================== #
+
+class TestStorageR2:
+    """Testa o comportamento de storage em modo produção (Cloudflare R2)."""
+
+    def test_save_prod_uploads_to_r2(self):
+        """save() em prod chama put_object e retorna chave S3 correta."""
+        mock_s3 = MagicMock()
+        file_content = b"fake pdf content"
+
+        mock_file = MagicMock()
+        mock_file.filename = "doc.pdf"
+        mock_file.read = AsyncMock(return_value=file_content)
+
+        async def _run():
+            with (
+                patch("app.services.storage._get_s3_client", return_value=mock_s3),
+                patch("app.services.storage.settings") as ms,
+            ):
+                ms.is_development = False
+                ms.AWS_BUCKET_NAME = "test-bucket"
+                return await save(mock_file, "tenant-xyz")
+
+        storage_path, file_type, size = asyncio.run(_run())
+
+        assert file_type == "pdf"
+        assert size == len(file_content)
+        assert storage_path.startswith("tenants/tenant-xyz/")
+        assert storage_path.endswith(".pdf")
+        mock_s3.put_object.assert_called_once()
+        call_kwargs = mock_s3.put_object.call_args.kwargs
+        assert call_kwargs["Bucket"] == "test-bucket"
+        assert call_kwargs["Key"] == storage_path
+        assert call_kwargs["Body"] == file_content
+
+    def test_delete_prod_calls_delete_object(self):
+        """delete() em prod chama delete_object no R2."""
+        mock_s3 = MagicMock()
+
+        with (
+            patch("app.services.storage._get_s3_client", return_value=mock_s3),
+            patch("app.services.storage.settings") as ms,
+        ):
+            ms.is_development = False
+            ms.AWS_BUCKET_NAME = "test-bucket"
+            delete("tenants/abc/file.pdf")
+
+        mock_s3.delete_object.assert_called_once_with(
+            Bucket="test-bucket",
+            Key="tenants/abc/file.pdf",
+        )
+
+    def test_delete_prod_is_silent_on_error(self):
+        """delete() em prod não propaga exceção (idempotente)."""
+        mock_s3 = MagicMock()
+        mock_s3.delete_object.side_effect = Exception("R2 unavailable")
+
+        with (
+            patch("app.services.storage._get_s3_client", return_value=mock_s3),
+            patch("app.services.storage.settings") as ms,
+        ):
+            ms.is_development = False
+            ms.AWS_BUCKET_NAME = "test-bucket"
+            delete("tenants/abc/file.pdf")  # não deve lançar
+
+    def test_download_to_tmp_calls_download_file_and_returns_path(self):
+        """download_to_tmp() chama download_file e retorna Path do arquivo temporário."""
+        mock_s3 = MagicMock()
+
+        def fake_download(bucket, key, dest):
+            Path(dest).write_bytes(b"r2 content")
+
+        mock_s3.download_file.side_effect = fake_download
+
+        with (
+            patch("app.services.storage._get_s3_client", return_value=mock_s3),
+            patch("app.services.storage.settings") as ms,
+        ):
+            ms.AWS_BUCKET_NAME = "test-bucket"
+            result = download_to_tmp("tenants/abc/file.txt", "txt")
+
+        assert result.exists()
+        assert result.suffix == ".txt"
+        assert result.read_bytes() == b"r2 content"
+        mock_s3.download_file.assert_called_once()
+        args = mock_s3.download_file.call_args[0]
+        assert args[0] == "test-bucket"
+        assert args[1] == "tenants/abc/file.txt"
+        result.unlink(missing_ok=True)
+
+    def test_download_to_tmp_cleans_up_on_download_error(self):
+        """download_to_tmp() remove o arquivo temporário se download_file falhar."""
+        mock_s3 = MagicMock()
+        mock_s3.download_file.side_effect = Exception("Network error")
+
+        with (
+            patch("app.services.storage._get_s3_client", return_value=mock_s3),
+            patch("app.services.storage.settings") as ms,
+        ):
+            ms.AWS_BUCKET_NAME = "test-bucket"
+            with pytest.raises(Exception, match="Network error"):
+                download_to_tmp("tenants/abc/file.txt", "txt")
+
+
+# =========================================================================== #
+# Ingest — extração de texto em prod                                            #
+# =========================================================================== #
+
+class TestExtractTextProd:
+    def test_extract_txt_prod_downloads_reads_and_cleans_up(self, tmp_path):
+        """Em prod, _extract_text baixa do R2, lê o conteúdo e deleta o arquivo temporário."""
+        tmp_file = tmp_path / "test.txt"
+        tmp_file.write_text("hello from r2", encoding="utf-8")
+
+        with (
+            patch("app.tasks.ingest.settings") as ms,
+            patch("app.tasks.ingest.download_to_tmp", return_value=tmp_file) as mock_dl,
+        ):
+            ms.is_development = False
+            from app.tasks.ingest import _extract_text
+            result = _extract_text("tenants/abc/file.txt", "txt")
+
+        assert result == "hello from r2"
+        mock_dl.assert_called_once_with("tenants/abc/file.txt", "txt")
+        assert not tmp_file.exists()  # finally deletou o arquivo temporário
 
 
 # =========================================================================== #

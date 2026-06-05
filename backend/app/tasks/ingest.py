@@ -22,6 +22,7 @@ from app.models.document import Document, DocumentStatus
 from app.models.chunk import Chunk
 from app.services.chunking import split_text
 from app.services.embedding import embed_texts
+from app.services.storage import download_to_tmp
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -36,13 +37,30 @@ def _get_pinecone_index():
     return pc.Index(settings.PINECONE_INDEX_NAME)
 
 
-def _extract_text(storage_path: str, file_type: str) -> str:
+def _read_local(path: Path, file_type: str) -> str:
+    """Lê arquivo local por tipo. Usado tanto em dev (caminho direto) quanto em prod (após download)."""
     if file_type == "txt":
-        return Path(storage_path).read_text(encoding="utf-8", errors="replace")
+        return path.read_text(encoding="utf-8", errors="replace")
     if file_type == "pdf":
-        reader = PdfReader(storage_path)
+        reader = PdfReader(str(path))
         return "\n".join(page.extract_text() or "" for page in reader.pages)
     raise ValueError(f"file_type não suportado: {file_type}")
+
+
+def _extract_text(storage_path: str, file_type: str) -> str:
+    """
+    Extrai texto do arquivo.
+    Dev:  lê direto do caminho local.
+    Prod: baixa do R2 para /tmp, processa e remove ao final.
+    """
+    if settings.is_development:
+        return _read_local(Path(storage_path), file_type)
+
+    tmp_path = download_to_tmp(storage_path, file_type)
+    try:
+        return _read_local(tmp_path, file_type)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def _set_status(

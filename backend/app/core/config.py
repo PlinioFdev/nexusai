@@ -43,8 +43,15 @@ class Settings(BaseSettings):
     # M2: Voyage AI — embeddings
     VOYAGE_API_KEY: str = ""
 
-    # M2: Storage — volume local em dev, trocar por S3 no M5
+    # M2: Storage — volume local em dev
     UPLOAD_DIR: str = "/app/uploads"
+
+    # M5: Storage — R2/S3 (prod)
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_BUCKET_NAME: str = "nexusai-uploads"
+    AWS_ENDPOINT_URL: str = ""  # R2: https://<account-id>.r2.cloudflarestorage.com
+    AWS_REGION: str = "auto"
 
     # M2: Chunking
     CHUNK_SIZE_TOKENS: int = 512
