@@ -1,16 +1,14 @@
 # render.yaml — NexusAI Infrastructure as Code
 #
 # Cria automaticamente:
-#   - nexusai-api    (Web Service — FastAPI)
-#   - nexusai-worker (Background Worker — Celery)
+#   - nexusai-api (Web Service — FastAPI + Celery worker combinados)
 #
 # Criar manualmente no dashboard Render antes de fazer o deploy:
 #   1. PostgreSQL → copiar a Internal Database URL → setar como DATABASE_URL
 #   2. Redis       → copiar a Internal Redis URL   → setar como REDIS_URL
 #
 # Variáveis marcadas com sync: false devem ser configuradas manualmente
-# no dashboard em Environment → Environment Variables de cada serviço.
-# Nunca commitar valores de segredos neste arquivo.
+# no dashboard em Environment → Environment Variables.
 
 services:
   - type: web
@@ -19,7 +17,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: bash start.sh
     envVars:
       # Valores fixos — sem segredo
       - key: ENVIRONMENT
@@ -51,41 +49,4 @@ services:
       - key: AWS_ENDPOINT_URL
         sync: false
       - key: BACKEND_CORS_ORIGINS
-        sync: false
-
-  - type: worker
-    name: nexusai-worker
-    runtime: python
-    plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.tasks.celery_app worker --loglevel=info
-    envVars:
-      # Valores fixos — idênticos ao nexusai-api
-      - key: ENVIRONMENT
-        value: production
-      - key: PINECONE_INDEX_NAME
-        value: nexusai
-      - key: AWS_BUCKET_NAME
-        value: nexusai-uploads
-      - key: AWS_REGION
-        value: auto
-      # Mesmos valores do nexusai-api — copiar do dashboard
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: PINECONE_API_KEY
-        sync: false
-      - key: VOYAGE_API_KEY
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: AWS_ENDPOINT_URL
         sync: false
