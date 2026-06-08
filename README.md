@@ -131,9 +131,9 @@ Adicione o chatbot a qualquer site com uma única linha:
 
 ```html
 <script
-  src="https://seu-frontend.vercel.app/widget/embed.js"
+  src="https://nexusai-gules-nine.vercel.app/widget/embed.js"
   data-api-key="sua-api-key-do-tenant"
-  data-base-url="https://seu-backend.onrender.com"
+  data-base-url="https://nexusai-api-s5m9.onrender.com"
 ></script>
 ```
 
@@ -194,7 +194,7 @@ VOYAGE_API_KEY      = pa-...
 AWS_ACCESS_KEY_ID   = ...
 AWS_SECRET_ACCESS_KEY = ...
 AWS_ENDPOINT_URL    = https://<account-id>.r2.cloudflarestorage.com
-BACKEND_CORS_ORIGINS = ["https://seu-frontend.vercel.app"]
+BACKEND_CORS_ORIGINS = ["https://nexusai-gules-nine.vercel.app"]
 
 > **Atenção:** `SECRET_KEY` deve ser **idêntico** em `nexusai-api` e `nexusai-worker` — ambos precisam assinar e verificar os mesmos tokens.
 
@@ -208,7 +208,7 @@ A migration `alembic upgrade head` roda automaticamente no startup do `nexusai-a
 New Project → Import Git Repository → selecionar nexusai → Root Directory: frontend
 
 **2. Configurar variável de ambiente**
-NEXT_PUBLIC_API_URL = https://nexusai-api.onrender.com
+NEXT_PUBLIC_API_URL = https://nexusai-api-s5m9.onrender.com
 
 **3. Deploy**
 
