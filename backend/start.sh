@@ -4,8 +4,8 @@ set -e
 # Roda migrations
 alembic upgrade head
 
-# Inicia Celery worker em background
-celery -A app.tasks.celery_app worker --loglevel=info &
+# Celery com pool=solo (single-thread) — reduz footprint de memória no free tier
+celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1 --pool=solo &
 
-# Inicia API em foreground (exec substitui o shell — PID correto para o Render)
+# API em foreground
 exec uvicorn app.main:app --host 0.0.0.0 --port $PORT
