@@ -11,16 +11,18 @@ import { defineConfig, devices } from '@playwright/test';
  *   npm run test:e2e
  *
  * Rodar contra produção:
- *   BASE_URL=https://nexusai.vercel.app NEXT_PUBLIC_API_URL=https://nexusai-api.onrender.com npm run test:e2e
+ *   BASE_URL=https://nexusai-gules-nine.vercel.app NEXT_PUBLIC_API_URL=https://nexusai-api-s5m9.onrender.com npm run test:e2e
  */
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: false,       // testes e2e têm estado — rodar em sequência
+  fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: 'html',
+  timeout: 180_000,          // 3 min por teste — ingestão real pode demorar
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:3000',
+    actionTimeout: 30_000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
