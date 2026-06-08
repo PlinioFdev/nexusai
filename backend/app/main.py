@@ -6,7 +6,7 @@ from app.api.v1 import api_router
 # Apenas POST /widget/chat é público — os demais endpoints do widget requerem JWT
 WIDGET_PUBLIC_PATHS = {"/api/v1/widget/chat"}
 
-_dashboard_origins = {str(o) for o in settings.BACKEND_CORS_ORIGINS}
+_dashboard_origins = {str(o).rstrip("/") for o in settings.BACKEND_CORS_ORIGINS}
 
 
 class SmartCORSMiddleware(BaseHTTPMiddleware):
