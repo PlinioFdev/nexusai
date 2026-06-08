@@ -52,9 +52,12 @@ export function useSessions(): UseChatsReturn {
 
   const createSession = useCallback(async (title?: string): Promise<ChatSessionResponse | null> => {
     try {
-      const session = await api.post<ChatSessionResponse>("/api/v1/chat/sessions", {
-        title: title ?? null,
-      });
+      // Omite title quando não fornecido — Pydantic usa o default "Nova conversa"
+      // Enviar title: null causa 422 porque o schema espera str, não null
+      const session = await api.post<ChatSessionResponse>(
+        "/api/v1/chat/sessions",
+        title ? { title } : {}
+      );
       setSessions((prev) => [session, ...prev]);
       setSessionsError(null);
       return session;
@@ -117,7 +120,6 @@ export function useMessages(sessionId: string | null): UseMessagesReturn {
       setIsSending(true);
       setMessagesError(null);
 
-      // Optimistic update — adiciona mensagem do usuário imediatamente
       const optimisticUserMsg: MessageResponse = {
         id: `optimistic-${Date.now()}`,
         session_id: sessionId,
@@ -133,14 +135,12 @@ export function useMessages(sessionId: string | null): UseMessagesReturn {
           `/api/v1/chat/sessions/${sessionId}/messages`,
           { content }
         );
-        // Substitui o optimistic pelo real + adiciona resposta do assistant
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== optimisticUserMsg.id),
           data.user_message,
           data.assistant_message,
         ]);
       } catch (err) {
-        // Remove optimistic em caso de erro
         setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id));
         if (err instanceof ApiError) {
           setMessagesError(err.message);
