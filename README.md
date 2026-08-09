@@ -67,7 +67,7 @@ flowchart TD
 ### 1. Clone e configure variáveis de ambiente
 
 ```bash
-git clone https://github.com/seu-usuario/nexusai.git
+git clone https://github.com/PlinioFdev/nexusai.git
 cd nexusai
 cp .env.example .env
 ```
